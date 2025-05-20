@@ -2,8 +2,10 @@
 # Copyright © 2021 Patrick Levin
 # SPDX-Identifier: MIT
 from dataclasses import dataclass
-import numpy as np
 from typing import Optional, Tuple, Union
+
+import numpy as np
+
 """Types used throughout the library"""
 
 
@@ -14,6 +16,7 @@ class ImageTensor:
 
     The data may contain an extra dimension for batching (the default).
     """
+
     tensor_data: np.ndarray
     padding: Tuple[float, float, float, float]
     original_size: Tuple[int, int]
@@ -27,6 +30,7 @@ class Rect:
     Normalized indicates whether properties are relative to image size
     (i.e. value range is [0,1]).
     """
+
     x_center: float
     y_center: float
     width: float
@@ -40,28 +44,30 @@ class Rect:
         w, h = self.width, self.height
         return (w, h) if self.normalized else (int(w), int(h))
 
-    def scaled(
-        self, size: Tuple[float, float], normalize: bool = False
-    ) -> 'Rect':
+    def scaled(self, size: Tuple[float, float], normalize: bool = False) -> "Rect":
         """Return a scaled version or self, if not normalized."""
         if self.normalized == normalize:
             return self
         sx, sy = size
         if normalize:
             sx, sy = 1 / sx, 1 / sy
-        return Rect(self.x_center * sx, self.y_center * sy,
-                    self.width * sx, self.height * sy,
-                    self.rotation, normalized=False)
+        return Rect(
+            self.x_center * sx,
+            self.y_center * sy,
+            self.width * sx,
+            self.height * sy,
+            self.rotation,
+            normalized=False,
+        )
 
     def points(self) -> np.ndarray:
-        """Return the corners of the box as a list of tuples `[(x, y), ...]`
-        """
+        """Return the corners of the box as a list of tuples `[(x, y), ...]`"""
         x, y = self.x_center, self.y_center
         w, h = self.width / 2, self.height / 2
         pts = [(x - w, y - h), (x + w, y - h), (x + w, y + h), (x - w, y + h)]
         if self.rotation == 0:
             return pts
-        s, c = np.math.sin(self.rotation), np.math.cos(self.rotation)
+        s, c = np.sin(self.rotation), np.cos(self.rotation)
         t = np.array(pts) - (x, y)
         r = np.array([[c, s], [-s, c]])
         return np.matmul(t, r) + (x, y)
@@ -74,6 +80,7 @@ class BBox:
     The bounds can be relative to image size (normalized, range [0,1]) or
     absolute (i.e. pixel-) coordinates.
     """
+
     xmin: float
     ymin: float
     xmax: float
@@ -109,7 +116,7 @@ class BBox:
         """Area of the bounding box, 0 if empty"""
         return self.width * self.height if not self.empty else 0
 
-    def intersect(self, other: 'BBox') -> Optional['BBox']:
+    def intersect(self, other: "BBox") -> Optional["BBox"]:
         """Return the intersection with another (non-rotated) bounding box
 
         Args:
@@ -126,14 +133,14 @@ class BBox:
         else:
             return None
 
-    def scale(self, size: Tuple[float, float]) -> 'BBox':
+    def scale(self, size: Tuple[float, float]) -> "BBox":
         """Scale the bounding box"""
         sx, sy = size
         xmin, ymin = self.xmin * sx, self.ymin * sy
         xmax, ymax = self.xmax * sx, self.ymax * sy
         return BBox(xmin, ymin, xmax, ymax)
 
-    def absolute(self, size: Tuple[int, int]) -> 'BBox':
+    def absolute(self, size: Tuple[int, int]) -> "BBox":
         """Return the box in absolute coordinates (if normalized)
 
         Args:
@@ -151,6 +158,7 @@ class BBox:
 @dataclass
 class Landmark:
     """An object landmark (3d point) detected by a model"""
+
     x: float
     y: float
     z: float
@@ -171,6 +179,7 @@ class Detection(object):
         nosetip = detection[3]
     ```
     """
+
     def __init__(self, data: np.ndarray, score: float) -> None:
         """Initialize a detection from data points.
 
@@ -203,6 +212,6 @@ class Detection(object):
         xmax, ymax = self.data[1]
         return BBox(xmin, ymin, xmax, ymax)
 
-    def scaled(self, factor: Union[Tuple[float, float], float]) -> 'Detection':
+    def scaled(self, factor: Union[Tuple[float, float], float]) -> "Detection":
         """Return a scaled version of the bounding box and keypoints"""
         return Detection(self.data * factor, self.score)
