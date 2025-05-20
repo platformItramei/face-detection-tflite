@@ -1,15 +1,17 @@
+import sys
 from bisect import bisect_left, bisect_right
 from os import PathLike
+from typing import Sequence, Tuple, Union
+
 import numpy as np
 from PIL import Image, ImageOps
 from PIL.Image import Image as PILImage
-import sys
-from typing import Sequence, Tuple, Union
+
 from fdlite.face_detection import FaceDetection, FaceDetectionModel
 from fdlite.face_landmark import FaceLandmark, face_detection_to_roi
-from fdlite.iris_landmark import IrisLandmark, IrisResults
-from fdlite.iris_landmark import iris_roi_from_face_landmarks
+from fdlite.iris_landmark import IrisLandmark, IrisResults, iris_roi_from_face_landmarks
 from fdlite.transform import bbox_from_landmarks
+
 """Iris recoloring example based on face- and iris detection models.
 """
 
@@ -19,9 +21,7 @@ _Rect = Tuple[int, int, int, int]
 
 
 def recolor_iris(
-    image: PILImage,
-    iris_results: IrisResults,
-    iris_color: Tuple[int, int, int]
+    image: PILImage, iris_results: IrisResults, iris_color: Tuple[int, int, int]
 ) -> PILImage:
     """Colorize an eye.
 
@@ -40,8 +40,8 @@ def recolor_iris(
     iris_location, iris_size = _get_iris_location(iris_results, image.size)
     # nothing fancy - just grab the iris part as an Image and work with that
     eye_image = image.transform(iris_size, Image.EXTENT, data=iris_location)
-    eye_image = eye_image.convert(mode='L')
-    eye_image = ImageOps.colorize(eye_image, 'black', 'white', mid=iris_color)
+    eye_image = eye_image.convert(mode="L")
+    eye_image = ImageOps.colorize(eye_image, "black", "white", mid=iris_color)
     # build a mask for copying back into the original image
     # no fancy anti-aliasing or blending, though
     mask = _get_iris_mask(iris_results, iris_location, iris_size, image.size)
@@ -49,9 +49,7 @@ def recolor_iris(
     return image
 
 
-def _get_iris_location(
-    results: IrisResults, image_size: _Size
-) -> Tuple[_Rect, _Size]:
+def _get_iris_location(results: IrisResults, image_size: _Size) -> Tuple[_Rect, _Size]:
     """Return iris location and -size"""
     bbox = bbox_from_landmarks(results.iris).absolute(image_size)
     width, height = int(bbox.width + 1), int(bbox.height + 1)
@@ -62,19 +60,19 @@ def _get_iris_location(
 
 
 def _get_iris_mask(
-    results: IrisResults,
-    iris_location: _Rect,
-    iris_size: _Size,
-    image_size: _Size
+    results: IrisResults, iris_location: _Rect, iris_size: _Size, image_size: _Size
 ) -> PILImage:
-    """Return a mask for the visible portion of the iris inside eye landmarks.
-    """
+    """Return a mask for the visible portion of the iris inside eye landmarks."""
     left, top, _, bottom = iris_location
     iris_width, iris_height = iris_size
     img_width, img_height = image_size
     # sort lexicographically by x then y
-    eyeball_sorted = sorted([(int(pt.x * img_width), int(pt.y * img_height))
-                             for pt in results.eyeball_contour])
+    eyeball_sorted = sorted(
+        [
+            (int(pt.x * img_width), int(pt.y * img_height))
+            for pt in results.eyeball_contour
+        ]
+    )
     bbox = bbox_from_landmarks(results.eyeball_contour).absolute(image_size)
     x_ofs = left
     y_ofs = top
@@ -91,7 +89,7 @@ def _get_iris_mask(
     b_sqr = b**2
     for y in range(y_start, y_end):
         # evaluate iris ellipse at y
-        x = int(a * np.math.sqrt(b_sqr - (y-cy)**2) / b)
+        x = int(a * np.sqrt(b_sqr - (y - cy) ** 2) / b)
         x0, x1 = cx - x, cx + x
         A, B = _find_contour_segment(eyeball_sorted, (x0, y))
         left_inside = _is_below_segment(A, B, (x0, y), box_center_y)
@@ -100,12 +98,12 @@ def _get_iris_mask(
         if not (left_inside or right_inside):
             continue
         elif not left_inside:
-            x0 = int(max((B[0] - A[0])/(B[1] - A[1]) * (y - A[1]) + A[0], x0))
+            x0 = int(max((B[0] - A[0]) / (B[1] - A[1]) * (y - A[1]) + A[0], x0))
         elif not right_inside:
-            x1 = int(min((D[0] - C[0])/(D[1] - C[1]) * (y - C[1]) + C[0], x1))
+            x1 = int(min((D[0] - C[0]) / (D[1] - C[1]) * (y - C[1]) + C[0], x1))
         # mark ellipse row as visible
-        mask[(y - y_ofs), int(x0 - x_ofs):int(x1 - x_ofs)] = 255
-    return Image.fromarray(mask, mode='L')
+        mask[(y - y_ofs), int(x0 - x_ofs) : int(x1 - x_ofs)] = 255
+    return Image.fromarray(mask, mode="L")
 
 
 def _is_below_segment(A: _Point, B: _Point, C: _Point, mid: int) -> bool:
@@ -130,10 +128,11 @@ def _find_contour_segment(
     """Find contour segment (points A and B) that contains the point.
     (contour must be lexicographically sorted!)
     """
+
     def distance(a: _Point, b: _Point) -> int:
         return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
 
-    MAX_IDX = len(contour)-1
+    MAX_IDX = len(contour) - 1
     # contour point left of point
     left_idx = max(bisect_left(contour, point) - 1, 0)
     right_idx = min(bisect_right(contour, point), MAX_IDX)
@@ -158,7 +157,7 @@ def main(image_file: Union[str, PathLike]) -> None:
     face_detection = FaceDetection(FaceDetectionModel.BACK_CAMERA)
     detections = face_detection(img)
     if not len(detections):
-        print('No face detected :(')
+        print("No face detected :(")
         exit(0)
     face_roi = face_detection_to_roi(detections[0], img.size)
 
@@ -181,8 +180,8 @@ def main(image_file: Union[str, PathLike]) -> None:
     img.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print('pass an image name as argument')
+        print("pass an image name as argument")
     else:
         main(sys.argv[1])
